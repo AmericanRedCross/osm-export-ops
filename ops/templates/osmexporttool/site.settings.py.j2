@@ -6,7 +6,7 @@ from .prod import *  # NOQA
 ALLOWED_HOSTS = ['{{ server_name }}']
 SESSION_COOKIE_DOMAIN = '{{ server_name }}'
 HOSTNAME = '{{ server_name }}'
-TASK_ERROR_EMAIL = 'gregcorradini@gmail.com'
+TASK_ERROR_EMAIL = '{{ admin_email }}'
 
 
 DATABASES = {
@@ -14,7 +14,6 @@ DATABASES = {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
         'NAME': '{{ db_name }}',
         'OPTIONS': {
-            'options': '-c search_path=exports,public',
             'sslmode': 'require',
         },
         'CONN_MAX_AGE': None,

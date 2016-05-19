@@ -1,49 +1,5 @@
 ---
 
-- name: create application user(s) and group(s)
-  hosts: all
-  gather_facts: no
-  become: yes # sudo
-  tasks:
-    - name: groupadd for g+rw perms on files
-      group:
-        name: "{{ item.group_name }}"
-        state: present
-      with_items: "{{ users_and_groups }}"
-
-    - name: useradd
-      user:
-        name: "{{ item.user_name }}"
-        generate_ssh_key: yes
-        shell: /bin/bash
-        createhome: yes
-        home: "/home/{{ item.user_name }}"
-        group: "{{ item.group_name }}"
-        state: present
-      with_items: "{{ users_and_groups }}"
-
-    - name: add umask to /home/<user>/.profile for g+rw perms on files
-      lineinfile:
-          dest: "/home/{{ app_user.user_name }}/.profile"
-          state: present
-          regexp: '^umask 002$'
-          insertafter: '# for ssh logins, install and configure the libpam-umask package.'
-          line: 'umask 002'
-
-#    - name: create the SSH public key file
-#      copy: content="{{ git_ssh_public_key }}"
-#            dest="/home/{{ app_user.user_name }}/.ssh/id_rsa.pub"
-#            mode=0644
-#      become: yes
-#      become_user: "{{ app_user.user_name }}"
-#
-#    - name: create the SSH private key file
-#      copy: content="{{ git_ssh_private_key }}"
-#            dest="/home/{{ app_user.user_name }}/.ssh/id_rsa"
-#            mode=0600
-#      become: yes
-#      become_user: "{{ app_user.user_name }}"
-
 - name: install build-essential and build tools
   hosts: all
   gather_facts: no
@@ -51,7 +7,9 @@
   tasks:
   - name: install build-essential and build tools
     apt:
-      name: build-essential,libtool,automake,binutils,git
+      # name: build-essential,libtool,automake,binutils,git
+      name: build-essential,git
+      install_recommends: no
       state: present
 
 - name: install base python dependencies
@@ -61,7 +19,8 @@
   tasks:
   - name: install python dependencies
     apt:
-      name: python-software-properties,python-dev,python-pycurl,python-pip,python-setuptools,python-virtualenv
+      name: python-dev,python-pip
+      install_recommends: no
       state: present
 
 - name: install postgresql, postgis and postgresql-common, contrib
@@ -85,17 +44,11 @@
   roles:
     - nginx
 
-- name: install 'nodejs' and 'posm' packages
+- name: install Node.js packages
   hosts: all
   gather_facts: yes
   become: yes # sudo
   tasks:
-  - name: install required apt-packages
-    apt:
-      name:  software-properties-common,apt-transport-https,lsb-release
-      state: present
-      install_recommends: no
-
   - name: get nodejs apt key
     apt_key: url=https://deb.nodesource.com/gpgkey/nodesource.gpg.key state=present
 
@@ -106,12 +59,6 @@
     apt:
      name: nodejs
      install_recommends: no
-
-  - name: install 'npm'
-    npm: name=npm version=3.3.12 global=yes
-
-  - name: install 'interp'
-    npm: name=interp global=yes
 
   - name: install 'tl'
     npm: name=tl global=yes
@@ -143,10 +90,6 @@
       mode: 0644
     notify: restart celery
 
-    # the 'notify' callback does not run for some reason, force it for now
-  - name: restart celery
-    service: name=celery state=restarted enabled=yes
-
   - name: install the 'celerybeat' upstart script
     template:
       src: templates/osmexporttool/celerybeat.upstart.conf.j2
@@ -155,11 +98,6 @@
       group: root
       mode: 0644
     notify: restart celerybeat
-
-    # the 'notify' callback does not run for some reason, force it for now
-  - name: restart celerybeat
-    service: name=celerybeat state=restarted enabled=yes
-
 
 - name: osm_export_tool project setup
   hosts: all
@@ -170,37 +108,12 @@
     file:
       dest: "{{ project_home }}"
       state: directory
-      owner: "{{ app_user.user_name }}"
-      group: "{{ app_user.group_name }}"
-      mode: 0774
-#    become: yes
-#    become_user: "{{ app_user.user_name }}"
-
-#  - name: create empty 'hotosm' virtualenv in project home
-#    pip:
-#      virtualenv_command: /usr/bin/virtualenv
-#      virtualenv: "{{ virtualenv_dir }}"
-#      virtualenv_site_packages: yes # include site packages
-#      name: ""
-#    become: yes
-#    become_user: "{{ app_user.user_name }}"
-
-#  - name: .bashrc should activate virtual environment when we change to that user
-#    lineinfile:
-#      dest: "/home/{{ app_user.user_name }}/.bashrc"
-#      regexp: "^source {{ virtualenv_dir }}/bin/activate; cd {{ project_home }}/{{ repo_name }};"
-#      insertafter: "^# User specific aliases and functions"
-#      line: "source {{ virtualenv_dir }}/bin/activate; cd {{ project_home }}/{{ repo_name }};"
-#    become: yes
-#    become_user: "{{ app_user.user_name }}"
+      owner: "{{ ansible_user }}"
 
   - name: create osm_export_tool DB
     postgresql_db:
       name: "{{ db_name }}"
-      encoding: 'UTF-8'
-      lc_collate: 'C.UTF-8'
-      lc_ctype: 'C.UTF-8'
-      template: 'template0'
+      login_user: "postgres"
 
   - name: add POSTGIS extension to the created db
     postgresql_ext:
@@ -218,20 +131,6 @@
       name: "{{ db_user }}"
       password: "{{ db_password }}"
 
-  - name: psql check schema 'exports'
-    command: psql -t -d "{{ db_name }}" -c "SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'exports');"
-    register: check_schema
-    changed_when: "'f' in '{{ check_schema.stdout }}'"
-    become: yes
-    become_user: postgres
-  - debug: var=check_schema
-
-  - name: psql schema 'exports'
-    command: psql -d "{{ db_name }}" -c "CREATE SCHEMA exports AUTHORIZATION {{ db_user }}; ALTER USER {{ db_user }} SET search_path TO exports, public;"
-    when: check_schema.changed
-    become: yes
-    become_user: postgres
-
   - name: setup GIS apt repository
     apt_repository:
       repo: 'ppa:ubuntugis/ubuntugis-unstable'
@@ -240,46 +139,36 @@
 
   - name: install GDAL packages
     apt:
-      name: gdal-bin,libgdal-dev,python-gdal
+      # name: gdal-bin,python-gdal
+      name: python-gdal
       state: present
 
   - name: install thirdparty dependency packages
     apt:
-      name: osmctools,spatialite-bin,libspatialite5,libspatialite-dev,default-jre,zip,unzip
+      # name: osmctools,spatialite-bin,libspatialite5,libspatialite-dev,default-jre,zip,unzip
+      name: osmctools,default-jre,zip,unzip
       state: present
 
   - name: create the thirdparty directory
     file:
       dest: "{{ thirdparty_dir }}"
       state: directory
-      owner: "{{ app_user.user_name }}"
-      group: "{{ app_user.group_name }}"
-      mode: 0777
+      owner: "{{ ansible_user }}"
 
   - name: create the exdir(s) for zipfiles
     file:
       dest: "{{ item.exdir }}"
       state: directory
-      owner: "{{ app_user.user_name }}"
-      group: "{{ app_user.group_name }}"
-      mode: 0777
+      owner: "{{ ansible_user }}"
     with_items: "{{ thirdparty_zipfiles }}"
 
-    # drop to shell here because 'get_url' and 'unarchive' are slow
-#  - name: download the thirdparty zips
-#    local_action:
-#    module: "shell wget -q {{ item.url }} -O {{ item.exdir }}"
-#    with_items: "{{ thirdparty_zipfiles }}"
-#    become: yes
-#    become_user: "{{ app_user.user_name }}"
-
   - name: download the thirdparty zips
+    environment:
+      http_proxy: http://10.0.1.75:1080/
     get_url:
       url: "{{ item.url }}"
       dest: "{{ item.exdir }}/{{ item.url | basename }}"
-      owner: "{{ app_user.user_name }}"
-      group: "{{ app_user.group_name }}"
-      mode: 0777
+      owner: "{{ ansible_user }}"
       force: no # make sure it doesn't do a download if dest exists
     with_items: "{{ thirdparty_zipfiles }}"
 
@@ -288,9 +177,7 @@
       creates: "{{ item.exdir }}/exists.txt" # determines if this should run
       src: "{{ item.exdir }}/{{ item.url | basename }}"
       dest: "{{ item.exdir }}"
-      owner: "{{ app_user.user_name }}"
-      group: "{{ app_user.group_name }}"
-      mode: 0777
+      owner: "{{ ansible_user }}"
       copy: no
     with_items: "{{ thirdparty_zipfiles }}"
 
@@ -298,26 +185,23 @@
     file:
       dest: "{{ item }}"
       state: directory
-      owner: "{{ app_user.user_name }}"
-      group: "{{ app_user.group_name }}"
-      mode: 0777
+      owner: "{{ ansible_user }}"
     with_items:
       - "{{ exports_staging_dir }}"
       - "{{ exports_download_dir }}"
-    become: yes
-    become_user: "{{ app_user.user_name }}"
-
 
 - name: osm_export_tool checkout and pip install
   hosts: all
-  gather_facts: yes
-  become: yes # sudo
+  gather_facts: no
+  environment:
+    DJANGO_SETTINGS_MODULE: "{{ django_settings_mod_path }}"
+#         line: "export STATIC_ROOT={{ project_static_dir }};"
   tasks:
-    - name: apt get dependecies that aren't listed in osm-export-tool2 docs
-      apt:
-        name: libxml2-dev,libxml2,libxslt1-dev,libxslt1.1
-        state: present
-
+#     - name: apt get dependencies that aren't listed in osm-export-tool2 docs
+#       apt:
+#         name: libxml2-dev,libxml2,libxslt1-dev,libxslt1.1
+#         state: present
+#
     - name: clone the osm-export-tool2 repository
       git:
         accept_hostkey: yes
@@ -327,33 +211,30 @@
         clone: yes
         update: yes
         force: yes
-      become: yes
-      become_user: "{{ app_user.user_name }}"
+      notify: restart gunicorn
 
     - name: create project /static/ if it doesn't exist
       file:
         dest: "{{ project_static_dir }}"
         state: directory
-        owner: "{{ app_user.user_name }}"
-        group: "{{ app_user.group_name }}"
-        mode: 0774
-      become: yes
-      become_user: "{{ app_user.user_name }}"
 
-#    - debug: msg="{{ lookup( 'env', 'C_INCLUDE_PATH' ) }}"
+    - name: install Python requirements from apt
+      become: yes
+      apt:
+        name: python-lxml,python-openid
+        state: present
+
     - name: pip install the requirements
+      become: yes
       pip:
-#        virtualenv_command: /usr/bin/virtualenv
-#        virtualenv: "{{ virtualenv_dir }}"
-#        virtualenv_site_packages: yes
         requirements: "{{ requirements_file }}"
-#      become: yes
-#      become_user: "{{ app_user.user_name }}"
 
     - name: pip install 'gunicorn'
+      become: yes
       pip: name=gunicorn
 
     - name: install the osm-export-tool2 'gunicorn' upstart script
+      become: yes
       template:
         src: templates/osmexporttool/gunicorn.upstart.conf.j2
         dest: /etc/init/osm-export-tool2.conf
@@ -362,15 +243,14 @@
         mode: 0644
       notify: restart gunicorn
 
-      # the 'notify' callback does not run for some reason, force it for now
-    - name: restart osm-export-tool2
-      service: name=osm-export-tool2 state=restarted enabled=yes
-
     - name: deactivate the default 'nginx' site
+      become: yes
       file: path=/etc/nginx/sites-enabled/default
             state=absent
+      notify: restart nginx
 
     - name: install the osm-export-tool2 'nginx' into sites-available
+      become: yes
       template:
         src: templates/osmexporttool/exports.nginx.j2
         dest: /etc/nginx/sites-available/exports
@@ -380,92 +260,75 @@
       notify: restart nginx
 
     - name: activate osm-export-tool2 'nginx' site
+      become: yes
       file: src=/etc/nginx/sites-available/exports
             dest=/etc/nginx/sites-enabled/exports
             state=link
       notify: restart nginx
-
-      # the 'notify' callback does not run for some reason, force it for now
-    - name: restart 'nginx'
-      service: name=nginx state=restarted enabled=yes
-
+#
     - name: create settings file
       template:
         src: "templates/osmexporttool/site.settings.py.j2"
         dest: "{{ settings_dest }}"
-        owner: "{{ app_user.user_name }}"
-        group: "{{ app_user.group_name }}"
-        mode: 0774
-      become: yes
-      become_user: "{{ app_user.user_name }}"
-
-    - name: add DJANGO_SETTINGS_MODULE to .bashrc
-      lineinfile:
-        dest: "/home/{{ app_user.user_name }}/.bashrc"
-        regexp: "^export DJANGO_SETTINGS_MODULE={{ django_settings_mod_path }};"
-        insertafter: "^# User specific aliases and functions"
-        line: "export DJANGO_SETTINGS_MODULE={{ django_settings_mod_path }};"
-      become: yes
-      become_user: "{{ app_user.user_name }}"
-
-    - name: add STATIC_ROOT to .bashrc
-      lineinfile:
-        dest: "/home/{{ app_user.user_name }}/.bashrc"
-        regexp: "^export STATIC_ROOT={{ project_static_dir }};"
-        insertafter: "^export DJANGO_SETTINGS_MODULE={{ django_settings_mod_path }};"
-        line: "export STATIC_ROOT={{ project_static_dir }};"
-      become: yes
-      become_user: "{{ app_user.user_name }}"
-
+        owner: "{{ ansible_user }}"
+      notify: restart gunicorn
+#
+#     - name: add DJANGO_SETTINGS_MODULE to .bashrc
+#       lineinfile:
+#         dest: "/home/{{ ansible_user }}/.bashrc"
+#         regexp: "^export DJANGO_SETTINGS_MODULE={{ django_settings_mod_path }};"
+#         insertafter: "^# User specific aliases and functions"
+#         line: "export DJANGO_SETTINGS_MODULE={{ django_settings_mod_path }};"
+#
+#     - name: add STATIC_ROOT to .bashrc
+#       lineinfile:
+#         dest: "/home/{{ ansible_user }}/.bashrc"
+#         regexp: "^export STATIC_ROOT={{ project_static_dir }};"
+#         insertafter: "^export DJANGO_SETTINGS_MODULE={{ django_settings_mod_path }};"
+#         line: "export STATIC_ROOT={{ project_static_dir }};"
+#
     - name: create garmin.conf.xml and overrite the current one
       template:
         src: "templates/osmexporttool/garmin_config.xml.j2"
         dest: "{{ garmin_xml_dest }}"
-        owner: "{{ app_user.user_name }}"
-        group: "{{ app_user.group_name }}"
-        mode: 0774
-      become: yes
-      become_user: "{{ app_user.user_name }}"
+        owner: "{{ ansible_user }}"
 
     - name: run 'python manage.py migrate'
       django_manage:
         command: migrate
         app_path: "{{ project_root }}"
         settings: "{{ django_settings_mod_path }}"
-      become: yes
-      become_user: "{{ app_user.user_name }}"
+      notify: restart gunicorn
 
     - name: run 'python manage.py collectstatic'
       django_manage:
         command: collectstatic
         app_path: "{{ project_root }}"
         settings: "{{ django_settings_mod_path }}"
-      become: yes
-      become_user: "{{ app_user.user_name }}"
-
-#    - name: set postfix option hostname
-#      debconf: name=postifx question="postfix/mailname" value="{{ansible_fqdn}}" vtype="string"
-#
-#    - name: set postfix option type as internet site
-#      debconf: name=postfix question="postfix/main_mailer_type" value="'Internet Site'" vtype="string"
+      notify: restart gunicorn
 
     - name: install postfix
+      become: yes
       apt: package={{ item }} state=installed force=yes update_cache=yes cache_valid_time=3600
       with_items:
         - postfix
 
-#    - name: install the postfix `main.cf` /etc/postfix
-#      template:
-#        src: templates/osmexporttool/postfix.main.cf.j2
-#        dest: /etc/postfix/main.cf
-#        owner: root
-#        group: root
-#        mode: 0644
-#      notify: reload postfix
-#
-#      # the 'notify' callback does not run for some reason, force it for now
-#    - name: restart postfix
-#      service: name=postfix state=restarted enabled=yes
-#
-#    - name: reload postfix
-#      service: name=postfix state=reloaded enabled=yes
+  handlers:
+    - include: handlers/nginx/handlers/main.yml
+    - include: handlers/postgres/handlers/main.yml
+    - include: handlers/rabbitmq/handlers/main.yml
+
+    - name: restart gunicorn
+      become: yes
+      service: name=osm-export-tool2 state=restarted enabled=yes
+      notify:
+        - restart celery
+        - restart celerybeat
+
+    - name: restart celery
+      become: yes
+      service: name=celery state=restarted enabled=yes
+
+    - name: restart celerybeat
+      become: yes
+      service: name=celerybeat state=restarted enabled=yes
