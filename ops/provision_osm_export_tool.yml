@@ -71,6 +71,9 @@
   - name: install 'tilejson'
     npm: name=tilejson global=yes
 
+  - name: install 'mbtiles'
+    npm: name=mbtiles global=yes
+
 
 - name: install celery and celerybeat
   hosts: all
@@ -140,14 +143,12 @@
 
   - name: install GDAL packages
     apt:
-      # name: gdal-bin,python-gdal
-      name: python-gdal
+      name: gdal-bin,python-gdal
       state: present
 
   - name: install thirdparty dependency packages
     apt:
-      # name: osmctools,spatialite-bin,libspatialite5,libspatialite-dev,default-jre,zip,unzip
-      name: osmctools,default-jre,zip,unzip
+      name: osmctools,spatialite-bin,libspatialite5,libspatialite-dev,default-jre,zip,unzip
       state: present
 
   - name: create the thirdparty directory
