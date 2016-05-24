@@ -173,8 +173,6 @@
     with_items: "{{ thirdparty_zipfiles }}"
 
   - name: download the thirdparty zips
-    environment:
-      http_proxy: http://10.0.1.75:1080/
     get_url:
       url: "{{ item.url }}"
       dest: "{{ item.exdir }}/{{ item.url | basename }}"

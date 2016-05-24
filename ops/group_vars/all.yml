@@ -15,7 +15,7 @@ project_static_dir: "{{ project_root }}/static/"
 requirements_file: "{{ project_root }}/requirements.txt"
 django_settings_mod_path: "core.settings.site"
 settings_dest: "{{ project_root }}/core/settings/site.py"
-server_name: "172.16.142.148"
+server_name: "localhost"
 
 #
 # postgres
