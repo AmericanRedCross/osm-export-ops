@@ -141,6 +141,7 @@
       db: "{{ db_name }}"
       name: "{{ db_user }}"
       password: "{{ db_password }}"
+  - debug: msg="DB_PASSWORD = {{ db_password }}"
 
   - name: setup GIS apt repository
     apt_repository:

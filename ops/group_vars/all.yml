@@ -21,8 +21,8 @@ server_name: "172.16.142.148"
 # postgres
 #
 db_name: exports
-db_user: "hot"
-db_password: password
+db_user: "{{ app_user.user_name }}"
+db_password: "{{ DB_PASSWORD }}" # you must set an environment variable called DB_PASSWORD to populate this
 pg_admin_user: 'postgres'
 
 #
