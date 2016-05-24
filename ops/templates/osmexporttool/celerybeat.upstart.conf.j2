@@ -19,7 +19,7 @@ end script
 exec start-stop-daemon \
         --start \
         --chdir {{ project_root }} \
-        --chuid {{ app_user.user_name }} \
+        --chuid {{ ansible_user }} \
         --make-pidfile \
         --pidfile /var/run/celery-beat.pid \
                 --exec /usr/local/bin/celery -- -A core beat >> /var/log/celery-beat.log 2>&1
