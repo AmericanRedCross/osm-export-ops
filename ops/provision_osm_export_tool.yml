@@ -79,6 +79,14 @@
   hosts: all
   gather_facts: no
   become: yes # sudo
+  handlers:
+    - name: restart celery
+      become: yes
+      service: name=celery state=restarted enabled=yes
+
+    - name: restart celerybeat
+      become: yes
+      service: name=celerybeat state=restarted enabled=yes
   tasks:
   - name: install celery
     pip:
@@ -197,7 +205,25 @@
   gather_facts: no
   environment:
     DJANGO_SETTINGS_MODULE: "{{ django_settings_mod_path }}"
-#         line: "export STATIC_ROOT={{ project_static_dir }};"
+  handlers:
+    - name: restart nginx
+      become: yes
+      service: name=nginx state=restarted
+
+    - name: restart gunicorn
+      become: yes
+      service: name=osm-export-tool2 state=restarted enabled=yes
+      notify:
+        - restart celery
+        - restart celerybeat
+
+    - name: restart celery
+      become: yes
+      service: name=celery state=restarted enabled=yes
+
+    - name: restart celerybeat
+      become: yes
+      service: name=celerybeat state=restarted enabled=yes
   tasks:
 #     - name: apt get dependencies that aren't listed in osm-export-tool2 docs
 #       apt:
@@ -314,23 +340,3 @@
       apt: package={{ item }} state=installed force=yes update_cache=yes cache_valid_time=3600
       with_items:
         - postfix
-
-  handlers:
-    - include: handlers/nginx/handlers/main.yml
-    - include: handlers/postgres/handlers/main.yml
-    - include: handlers/rabbitmq/handlers/main.yml
-
-    - name: restart gunicorn
-      become: yes
-      service: name=osm-export-tool2 state=restarted enabled=yes
-      notify:
-        - restart celery
-        - restart celerybeat
-
-    - name: restart celery
-      become: yes
-      service: name=celery state=restarted enabled=yes
-
-    - name: restart celerybeat
-      become: yes
-      service: name=celerybeat state=restarted enabled=yes
