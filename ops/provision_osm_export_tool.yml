@@ -7,7 +7,6 @@
   tasks:
   - name: install build-essential and build tools
     apt:
-      # name: build-essential,libtool,automake,binutils,git
       name: build-essential,git
       install_recommends: no
       state: present
@@ -225,11 +224,6 @@
       become: yes
       service: name=celerybeat state=restarted enabled=yes
   tasks:
-#     - name: apt get dependencies that aren't listed in osm-export-tool2 docs
-#       apt:
-#         name: libxml2-dev,libxml2,libxslt1-dev,libxslt1.1
-#         state: present
-#
     - name: clone the osm-export-tool2 repository
       git:
         accept_hostkey: yes
@@ -293,28 +287,14 @@
             dest=/etc/nginx/sites-enabled/exports
             state=link
       notify: restart nginx
-#
+
     - name: create settings file
       template:
         src: "templates/osmexporttool/site.settings.py.j2"
         dest: "{{ settings_dest }}"
         owner: "{{ ansible_user }}"
       notify: restart gunicorn
-#
-#     - name: add DJANGO_SETTINGS_MODULE to .bashrc
-#       lineinfile:
-#         dest: "/home/{{ ansible_user }}/.bashrc"
-#         regexp: "^export DJANGO_SETTINGS_MODULE={{ django_settings_mod_path }};"
-#         insertafter: "^# User specific aliases and functions"
-#         line: "export DJANGO_SETTINGS_MODULE={{ django_settings_mod_path }};"
-#
-#     - name: add STATIC_ROOT to .bashrc
-#       lineinfile:
-#         dest: "/home/{{ ansible_user }}/.bashrc"
-#         regexp: "^export STATIC_ROOT={{ project_static_dir }};"
-#         insertafter: "^export DJANGO_SETTINGS_MODULE={{ django_settings_mod_path }};"
-#         line: "export STATIC_ROOT={{ project_static_dir }};"
-#
+
     - name: create garmin.conf.xml and overrite the current one
       template:
         src: "templates/osmexporttool/garmin_config.xml.j2"
