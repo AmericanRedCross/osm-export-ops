@@ -50,7 +50,7 @@ rabbitmq_pass: "{{ db_password }}"
 #
 # export folders and settings.py
 #
-exports_dir: /opt/local/exports
+exports_dir: /opt/exports
 exports_staging_dir: "{{ exports_dir }}/staging/"
 exports_media_dir: "/downloads/" # so nginx can handback downloads
 exports_download_dir: "{{ exports_dir }}/download/"
