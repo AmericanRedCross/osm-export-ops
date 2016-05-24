@@ -37,7 +37,7 @@ thirdparty_zipfiles:
     exdir: "{{ thirdparty_dir }}/mkgmap"
   - url: http://www.mkgmap.org.uk/download/splitter-r435.zip
     exdir: "{{ thirdparty_dir }}/splitter"
-osmandmapcreator_dir: "{{ thirdparty_zipfiles[1].exdir }}"
+osmandmapcreator_dir: "{{ thirdparty_zipfiles[0].exdir }}"
 mkgmap_dir: "{{ thirdparty_zipfiles[1].exdir }}/{{ thirdparty_zipfiles[1].url | basename | splitext | first }}"
 splitter_dir: "{{ thirdparty_zipfiles[2].exdir }}/{{ thirdparty_zipfiles[2].url | basename | splitext | first }}"
 
