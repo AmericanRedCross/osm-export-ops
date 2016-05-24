@@ -11,6 +11,7 @@
       name: build-essential,git
       install_recommends: no
       state: present
+      update_cache: yes
 
 - name: install base python dependencies
   hosts: all
