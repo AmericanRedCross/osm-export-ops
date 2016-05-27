@@ -72,4 +72,26 @@ You can interact with the osm-export-tool2 `gunicorn` service (after sshing into
 
 ## Getting Started with AWS
 
-0. To be continued...
+Create an `inventory` similar to:
+
+```
+172.16.142.148 ansible_user=ubuntu DB_PASSWORD=whatever
+```
+
+Replace the IP address with the hostname/IP of the instance being provisioned, `ansible_user` with
+the user account to log in as, and `DB_PASSWORD` with your desired Postgres password.
+
+Change `localhost` in `ops/provision_osm_export_tool.yml` to refer to the publicly-addressable
+hostname of the instance.
+
+Now run `ansible-playbook` to provision the instance:
+
+```bash
+ansible-playbook -i inventory ops/provision_osm_export_tool.yml
+```
+
+When it's complete, the OSM Export Tool will be available at http://<hostname>/.
+
+When testing locally, it may not be able to send mail. In that case, follow [this
+guide](http://www.tech-g.com/2012/07/15/inspecting-postfixs-email-queue/) to view the contents of
+the `postfix` queue and retrieve your email confirmation link.
